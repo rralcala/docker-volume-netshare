@@ -4,26 +4,23 @@ GO_XC = goxc -os="linux" -bc="linux,amd64,arm" -tasks-="rmbin"
 
 GOXC_FILE = .goxc.local.json
 
-all: deps compile
+all: package
 
-compile: goxc
+compile:
+	GOOS=linux GOARCH=amd64 go build -o docker-volume-netshare-amd64
+	GOOS=linux GOARCH=arm64 go build -o docker-volume-netshare-arm64
 
-goxc:
-	$(shell echo '{\n "ConfigVersion": "0.9",\n "PackageVersion": "$(VERSION)",' > $(GOXC_FILE))
-	$(shell echo ' "TaskSettings": {' >> $(GOXC_FILE))
-	$(shell echo '  "bintray": {\n   "apikey": "$(BINTRAY_APIKEY)"' >> $(GOXC_FILE))
-	$(shell echo '  },' >> $(GOXC_FILE))
-	$(shell echo '  "publish-github": {' >> $(GOXC_FILE))
-	$(shell echo '     "apikey": "$(GITHUB_APIKEY)",' >> $(GOXC_FILE))
-	$(shell echo '     "body": "",' >> $(GOXC_FILE))
-	$(shell echo '     "include": "*.zip,*.tar.gz,*.deb,docker-volume-netshare_$(VERSION)_linux_amd64-bin,docker-volume-netshare_$(VERSION)_linux_arm-bin"' >> $(GOXC_FILE))
-	$(shell echo '  }\n } \n}' >> $(GOXC_FILE))
-	$(GO_XC)
-	cp build/$(VERSION)/linux_amd64/docker-volume-netshare build/$(VERSION)/docker-volume-netshare_$(VERSION)_linux_amd64-bin
-	cp build/$(VERSION)/linux_arm/docker-volume-netshare build/$(VERSION)/docker-volume-netshare_$(VERSION)_linux_arm-bin
+package: deps compile
+	rm docker-volume-netshare_0.35_amd64.deb
+	fpm -s dir -t deb -n docker-volume-netshare -a amd64 -v 0.35 \
+      docker-volume-netshare-amd64=/usr/bin/docker-volume-netshare \
+      support/sysvinit-debian/=/
+	fpm -s dir -t deb -n docker-volume-netshare -a arm64 -v 0.35 \
+		docker-volume-netshare-arm64=/usr/bin/docker-volume-netshare \
+		support/sysvinit-debian/=/
 
 deps:
-	go get
+	go mod tidy 
 
 format:
 	$(GO_FMT)
@@ -33,3 +30,9 @@ bintray:
 
 github:
 	$(GO_XC) publish-github
+
+clean:
+	rm docker-volume-netshare-amd64
+	rm docker-volume-netshare-arm64
+	rm docker-volume-netshare_0.35_amd64.deb
+	rm docker-volume-netshare_0.35_arm64.deb
